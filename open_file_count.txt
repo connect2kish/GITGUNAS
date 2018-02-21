@@ -1,0 +1,36 @@
+#!/bin/bash
+# open_file_count.sh
+# Written by Tim Smith 2017-11-01
+#
+# Lists all processes owned by a user along with the process open file count and max open files settings.
+#
+# Usage:
+# open_file_count.sh [username]
+
+infa_service_user=$1
+
+echo
+
+unset words ln pid
+while IFS= read -er ln
+do
+   declare -a words=($ln)
+   add_on="File Handles Current / Max"
+   if [[ ${words[0]} =~ ^-?[0-9]+$ ]]
+   then
+      declare -i pid=${words[0]}
+      if [ ! -r /proc/$pid/limits ]
+      then
+         echo "ERROR: Cannot read /proc/$pid/limits   Try sudo $0"
+         # exit 1
+      fi
+      max_files_open=$( sed '/Max open files/!d; s/Max open files \+//; s/ .\+//' /proc/$pid/limits )
+      current_files_open=$( ls /proc/$pid/fd | wc -l )
+      LC_ALL=en_US.UTF-8 printf -v add_on "%'20d / %'6d" ${current_files_open} ${max_files_open}
+   fi
+   printf "%-30s %s\n" "${ln}" "${add_on}"
+done < <(
+   ps  c -u ${infa_service_user:=infa} -o pid,command --forest
+)
+
+echo
